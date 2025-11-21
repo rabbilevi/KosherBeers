@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Certified Beers 2025</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- Google Font (optional) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600&display=swap" rel="stylesheet">
+
+  <!-- PapaParse for robust CSV parsing -->
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+
+  <style>
+    :root {
+      --bg: #f5f7fb;
+      --card-bg: #ffffff;
+      --accent: #2c7be5;
+      --accent-soft: rgba(44, 123, 229, 0.1);
+      --text-main: #222222;
+      --text-muted: #666666;
+      --border: #dddddd;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: "Montserrat", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text-main);
+    }
+
+    .page {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 1.5rem;
+    }
+
+    header {
+      margin-bottom: 1.5rem;
+    }
+
+    header h1 {
+      margin: 0 0 0.25rem;
+      font-size: 1.9rem;
+      font-weight: 600;
+    }
+
+    header p {
+      margin: 0;
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border-radius: 0.75rem;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.04);
+      padding: 1rem 1.25rem 1.25rem;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+      align-items: flex-end;
+    }
+
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      min-width: 150px;
+      flex: 1;
+    }
+
+    .control-group label {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+    }
+
+    .control-group input,
+    .control-group select {
+      padding: 0.45rem 0.6rem;
+      border-radius: 0.4rem;
+      border: 1px solid var(--border);
+      font-size: 0.9rem;
+      outline: none;
+      background: #fff;
+    }
+
+    .control-group input:focus,
+    .control-group select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px var(--accent-soft);
+    }
+
+    .summary {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-bottom: 0.75rem;
+    }
+
+    .table-wrapper {
+      position: relative;
+      border-radius: 0.65rem;
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+
+    .table-scroll {
+      max-height: 65vh;
+      overflow: auto;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      background: #fff;
+      font-size: 0.85rem;
+    }
+
+    thead {
+      position: sticky;
+      top: 0;
+      background: #f0f4ff;
+      z-index: 1;
+    }
+
+    th,
+    td {
+      padding: 0.4rem 0.6rem;
+      border-bottom: 1px solid #eee;
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    th {
+      font-weight: 600;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #4b4b4b;
+    }
+
+    tbody tr:nth-child(even) {
+      background: #fafbff;
+    }
+
+    tbody tr:hover {
+      background: var(--accent-soft);
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.05rem 0.35rem;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-weight: 500;
+    }
+
+    .loading,
+    .error {
+      padding: 0.75rem 0.6rem;
+      font-size: 0.9rem;
+    }
+
+    .loading {
+      color: var(--text-muted);
+    }
+
+    .error {
+      color: #b00020;
+    }
+
+    @media (max-width: 768px) {
+      .page {
+        padding: 0.75rem;
+      }
+
+      header h1 {
+        font-size: 1.5rem;
+      }
+
+      .controls {
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <h1>Certified Beers 2025</h1>
+      <p>Interactive list of certified beers with search and filters. Data sourced from the 2025 certification spreadsheet.</p>
+    </header>
+
+    <div class="card">
+      <div class="controls">
+        <div class="control-group" style="flex: 2;">
+          <label for="search">Search (any column)</label>
+          <input
+            type="text"
+            id="search"
+            placeholder="Type to search by brand, label name, symbol, notes..."
+          />
+        </div>
+
+        <div class="control-group">
+          <label for="filter-category">Category</label>
+          <select id="filter-category">
+            <option value="__all__">All</option>
+          </select>
+        </div>
+
+        <div class="control-group">
+          <label for="filter-brand">Brand Name</label>
+          <select id="filter-brand">
+            <option value="__all__">All</option>
+          </select>
+        </div>
+
+        <div class="control-group">
+          <label for="filter-symbol">Symbol</label>
+          <select id="filter-symbol">
+            <option value="__all__">All</option>
+          </select>
+        </div>
+
+        <div class="control-group">
+          <label for="filter-dpm">D/P/M</label>
+          <select id="filter-dpm">
+            <option value="__all__">All</option>
+          </select>
+        </div>
+
+        <div class="control-group">
+          <label for="filter-group">Group</label>
+          <select id="filter-group">
+            <option value="__all__">All</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="summary" id="summary">
+        Loading data…
+      </div>
+
+      <div class="table-wrapper">
+        <div id="message" class="loading">Loading table…</div>
+        <div class="table-scroll" id="table-container" style="display:none;">
+          <table id="beer-table">
+            <thead>
+              <!-- populated in JS -->
+            </thead>
+            <tbody>
+              <!-- populated in JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // === CONFIG ===
+    // Name of the CSV file you’ll put next to this index.html in GitHub.
+    // Export your Excel file as CSV with these columns:
+    // Category, Brand Name, Symbol, Label Name, Label Comp, D/P/M,
+    // Symbol Required?, Notes, KID, Expires, Group
+    const CSV_URL = "certified-beers-2025.csv";
+
+    const summaryEl = document.getElementById("summary");
+    const messageEl = document.getElementById("message");
+    const tableContainer = document.getElementById("table-container");
+    const table = document.getElementById("beer-table");
+    const thead = table.querySelector("thead");
+    const tbody = table.querySelector("tbody");
+
+    const searchInput = document.getElementById("search");
+    const filterCategory = document.getElementById("filter-category");
+    const filterBrand = document.getElementById("filter-brand");
+    const filterSymbol = document.getElementById("filter-symbol");
+    const filterDpm = document.getElementById("filter-dpm");
+    const filterGroup = document.getElementById("filter-group");
+
+    let fullData = [];
+    let filteredData = [];
+
+    const filters = {
+      search: "",
+      Category: "__all__",
+      "Brand Name": "__all__",
+      Symbol: "__all__",
+      "D/P/M": "__all__",
+      Group: "__all__",
+    };
+
+    function normalize(value) {
+      if (value === null || value === undefined) return "";
+      return String(value).trim();
+    }
+
+    function updateSummary() {
+      if (!fullData.length) {
+        summaryEl.textContent = "No data loaded.";
+        return;
+      }
+      summaryEl.innerHTML =
+        `<span class="badge">${filteredData.length}</span> of ${fullData.length} rows shown`;
+    }
+
+    function renderTableHeader(columns) {
+      thead.innerHTML = "";
+      const tr = document.createElement("tr");
+      columns.forEach((col) => {
+        const th = document.createElement("th");
+        th.textContent = col;
+        tr.appendChild(th);
+      });
+      thead.appendChild(tr);
+    }
+
+    function renderTableRows(data, columns) {
+      tbody.innerHTML = "";
+      data.forEach((row) => {
+        const tr = document.createElement("tr");
+        columns.forEach((col) => {
+          const td = document.createElement("td");
+          td.textContent = normalize(row[col]);
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      });
+    }
+
+    function buildFilterOptions() {
+      const unique = (colName) => {
+        const set = new Set();
+        fullData.forEach((row) => {
+          const val = normalize(row[colName]);
+          if (val) set.add(val);
+        });
+        return Array.from(set).sort((a, b) => a.localeCompare(b));
+      };
+
+      const fillSelect = (select, options) => {
+        // keep first "All" option
+        select.innerHTML = "";
+        const allOpt = document.createElement("option");
+        allOpt.value = "__all__";
+        allOpt.textContent = "All";
+        select.appendChild(allOpt);
+
+        options.forEach((opt) => {
+          const o = document.createElement("option");
+          o.value = opt;
+          o.textContent = opt;
+          select.appendChild(o);
+        });
+      };
+
+      if (fullData.length === 0) return;
+
+      fillSelect(filterCategory, unique("Category"));
+      fillSelect(filterBrand, unique("Brand Name"));
+      fillSelect(filterSymbol, unique("Symbol"));
+      fillSelect(filterDpm, unique("D/P/M"));
+      fillSelect(filterGroup, unique("Group"));
+    }
+
+    function applyFilters() {
+      const q = filters.search.toLowerCase();
+
+      filteredData = fullData.filter((row) => {
+        // Search across all fields
+        if (q) {
+          const haystack = Object.values(row)
+            .map((v) => normalize(v).toLowerCase())
+            .join(" ");
+          if (!haystack.includes(q)) return false;
+        }
+
+        const cat = normalize(row["Category"]);
+        const brand = normalize(row["Brand Name"]);
+        const symbol = normalize(row["Symbol"]);
+        const dpm = normalize(row["D/P/M"]);
+        const group = normalize(row["Group"]);
+
+        if (filters.Category !== "__all__" && cat !== filters.Category) return false;
+        if (filters["Brand Name"] !== "__all__" && brand !== filters["Brand Name"]) return false;
+        if (filters.Symbol !== "__all__" && symbol !== filters.Symbol) return false;
+        if (filters["D/P/M"] !== "__all__" && dpm !== filters["D/P/M"]) return false;
+        if (filters.Group !== "__all__" && group !== filters.Group) return false;
+
+        return true;
+      });
+
+      const columns = Object.keys(fullData[0] || {});
+      renderTableRows(filteredData, columns);
+      updateSummary();
+    }
+
+    function attachControlListeners() {
+      searchInput.addEventListener("input", (e) => {
+        filters.search = e.target.value;
+        applyFilters();
+      });
+
+      filterCategory.addEventListener("change", (e) => {
+        filters.Category = e.target.value;
+        applyFilters();
+      });
+
+      filterBrand.addEventListener("change", (e) => {
+        filters["Brand Name"] = e.target.value;
+        applyFilters();
+      });
+
+      filterSymbol.addEventListener("change", (e) => {
+        filters.Symbol = e.target.value;
+        applyFilters();
+      });
+
+      filterDpm.addEventListener("change", (e) => {
+        filters["D/P/M"] = e.target.value;
+        applyFilters();
+      });
+
+      filterGroup.addEventListener("change", (e) => {
+        filters.Group = e.target.value;
+        applyFilters();
+      });
+    }
+
+    function loadCsv() {
+      messageEl.textContent = "Loading data from CSV…";
+      tableContainer.style.display = "none";
+
+      Papa.parse(CSV_URL, {
+        download: true,
+        header: true,
+        skipEmptyLines: true,
+        complete: function (results) {
+          fullData = results.data || [];
+          if (!fullData.length) {
+            messageEl.className = "error";
+            messageEl.textContent = "CSV loaded but no rows found.";
+            summaryEl.textContent = "No data.";
+            return;
+          }
+
+          const columns = Object.keys(fullData[0]);
+          renderTableHeader(columns);
+          buildFilterOptions();
+          filteredData = fullData.slice();
+          renderTableRows(filteredData, columns);
+          attachControlListeners();
+          updateSummary();
+
+          messageEl.style.display = "none";
+          tableContainer.style.display = "block";
+        },
+        error: function (err) {
+          messageEl.className = "error";
+          messageEl.textContent =
+            "Failed to load CSV. Check the file name and that it's in the same folder as index.html. Error: " +
+            err.message;
+          summaryEl.textContent = "Error loading data.";
+        },
+      });
+    }
+
+    // Init
+    loadCsv();
+  </script>
+</body>
+</html>
